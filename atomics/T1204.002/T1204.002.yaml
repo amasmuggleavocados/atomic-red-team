@@ -138,4 +138,52 @@ atomic_tests:
       if (Test-Path #{jse_path}) { Remove-Item #{jse_path} }
       Remove-ItemProperty -Path 'HKCU:\Software\Microsoft\Office\#{ms_office_version}\#{ms_product}\Security\' -Name 'AccessVBOM' -ErrorAction Ignore
     name: powershell
-
+- name: Code execution via Excel AddIn
+  auto_generated_guid: 
+  description: |
+    This module executes calc.exe via a malicious Excel Addin
+  supported_platforms:
+  - windows
+  input_arguments:
+    ms_product:
+      description: Maldoc application Word or Excel
+      type: String
+      default: Excel
+    ms_office_version:
+      description: Microsoft Office version number found in "HKEY_CURRENT_USER\SOFTWARE\Microsoft\Office"
+      type: String
+      default: "15.0"
+    path_to_xla:
+      description: Path to the XLA file
+      type: String
+      default: PathToAtomicsFolder\T1204.002\src\CodeExec.xlam
+  dependency_executor_name: powershell
+  dependencies:
+  - description: |
+      Test Requires MS Office to be installed and have been run previously. Run -GetPrereqs to run msword and build dependent registry keys
+    prereq_command: |
+      If (Test-Path HKCU:SOFTWARE\Microsoft\Office\#{ms_office_version}) { exit 0 } else { exit 1 }
+    get_prereq_command: |
+      $xlApp = New-Object -ComObject "Excel.Application"
+      Stop-Process -Name EXCEL
+  executor:
+    command: |
+      $fpath = "#{path_to_xla}"
+      $macro = "CodeExec"
+      $xlApp = New-Object -ComObject Excel.Application
+      $xlApp.Visible = $false
+      $xlBook = $xlApp.Workbooks.Add()
+      $xlAddin = $xlBook.Application.Addins.Add($fpath, $true)
+      $xlAddin.Installed = $true
+      $xlApp.Run($macro)
+      $xlBook.Close($false)
+      $xlApp.Quit()
+      [System.Runtime.Interopservices.Marshal]::ReleaseComObject($xlBook) | Out-Null
+      [System.Runtime.Interopservices.Marshal]::ReleaseComObject($xlApp) | Out-Null
+      [System.GC]::Collect()
+      [System.GC]::WaitForPendingFinalizers()
+      Remove-Variable xlBook
+      Remove-Variable xlApp
+    cleanup_command: |
+      Remove-ItemProperty -Path 'HKCU:\Software\Microsoft\Office\#{ms_office_version}\#{ms_product}\Security\' -Name 'AccessVBOM' -ErrorAction Ignore
+    name: powershell
