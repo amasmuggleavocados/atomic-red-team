@@ -144,35 +144,22 @@ atomic_tests:
     This module executes calc.exe via a remotely hosted, github.com, macro enabled Word document template
   supported_platforms:
   - windows
-  input_arguments:
-    ms_product:
-      description: Maldoc application Word or Excel
-      type: String
-      default: Word
-    ms_office_version:
-      description: Microsoft Office version number found in "HKEY_CURRENT_USER\SOFTWARE\Microsoft\Office"
-      type: String
-      default: $(((Get-ChildItem Registry::HKEY_CURRENT_USER\Software\Microsoft\Office -Name | select-string -pattern "^\d+\.\d+$").line.foreach({[decimal]$_}) | Sort-Object -desc)[0])
-    path_to_word:
-      description: Path to Office installation
-      type: String
-      default: C:\Program Files\Microsoft Office\Office15\WinWord.exe
-    path_to_doc:
-      description: Path to trojaned document
-      type: String
-      default: PathToAtomicsFolder\T1204.002\src\Doc1.docx
   dependency_executor_name: powershell
   dependencies:
   - description: |
-      Test Requires MS Office to be installed and have been run previously. Run -GetPrereqs to run msword and build dependent registry keys
+      Microsoft Word must be installed
     prereq_command: |
-      If (Test-Path HKCU:SOFTWARE\Microsoft\Office\#{ms_office_version}) { exit 0 } else { exit 1 }
+      try {
+        New-Object -COMObject "Word.Application" | Out-Null
+        $process = "Word"; if ( $process -eq "Word") {$process = "winword"}
+        Stop-Process -Name $process
+        exit 0
+      } catch { exit 1 }
     get_prereq_command: |
-      $xlApp = New-Object -ComObject "Excel.Application"
-      Stop-Process -Name EXCEL
+      Write-Host "You will need to install Microsoft Word manually to meet this requirement"
   executor:
     command: |
-      Start-Process "#{path_to_word}" "#{path_to_doc}"
-    cleanup_command: |
-      Remove-ItemProperty -Path 'HKCU:\Software\Microsoft\Office\#{ms_office_version}\#{ms_product}\Security\' -Name 'AccessVBOM' -ErrorAction Ignore
+      $wdApp = New-Object -COMObject "Word.Application"
+      $path = $wdApp.Path
+      Start-Process "$path\WINWORD.EXE" "PathToAtomicsFolder\T1204.002\src\Doc1.docx"
     name: powershell
